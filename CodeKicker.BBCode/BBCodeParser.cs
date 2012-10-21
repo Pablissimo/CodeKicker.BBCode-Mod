@@ -118,6 +118,14 @@ namespace CodeKicker.BBCode
         }
         bool MatchStartTag(string bbCode, ref int pos, Stack<SyntaxTreeNode> stack)
         {
+            // Before we do *anything* - if the topmost node on the stack is marked as StopProcessing then
+            // don't match anything
+            var topmost = stack.Peek() as TagNode;
+            if (topmost != null && topmost.Tag.StopProcessing)
+            {
+                return false;
+            }
+
             int end = pos;
             var tag = ParseTagStart(bbCode, ref end);
             if (tag != null)
@@ -213,7 +221,7 @@ namespace CodeKicker.BBCode
 
             var result = new TagNode(tag);
 
-            var defaultAttrValue = ParseAttributeValue(input, ref end);
+            var defaultAttrValue = ParseAttributeValue(input, ref end, tag.GreedyAttributeProcessing);
             if (defaultAttrValue != null)
             {
                 var attr = tag.FindAttribute("");
@@ -239,6 +247,8 @@ namespace CodeKicker.BBCode
             }
             if (!ParseChar(input, ref end, ']') && ErrorOrReturn("TagNotClosed", tagName)) return null;
 
+            ParseWhitespace(input, ref end);
+
             pos = end;
             return result;
         }
@@ -258,6 +268,13 @@ namespace CodeKicker.BBCode
             {
                 if (ErrorMode == ErrorMode.ErrorFree) return null;
                 else throw new BBCodeParsingException("");
+            }
+
+            var tag = Tags.SingleOrDefault(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+
+            if (tag != null && tag.SuppressFirstNewlineAfter)
+            {
+                ParseLimitedWhitespace(input, ref end, 1);
             }
 
             pos = end;
@@ -347,14 +364,24 @@ namespace CodeKicker.BBCode
             pos = end;
             return result;
         }
-        static string ParseAttributeValue(string input, ref int pos)
+        static string ParseAttributeValue(string input, ref int pos, bool greedyProcessing = false)
         {
             var end = pos;
 
             if (end >= input.Length || input[end] != '=') return null;
             end++;
 
-            var endIndex = input.IndexOfAny(" []".ToCharArray(), end);
+            var endIndex = -1;
+
+            if (!greedyProcessing)
+            {
+                endIndex = input.IndexOfAny(" []".ToCharArray(), end);
+            }
+            else
+            {
+                endIndex = input.IndexOfAny("[]".ToCharArray(), end);
+            }
+
             if (endIndex == -1) endIndex = input.Length;
 
             var valStart = pos + 1;
@@ -367,6 +394,46 @@ namespace CodeKicker.BBCode
             int end = pos;
             while (end < input.Length && char.IsWhiteSpace(input[end]))
                 end++;
+
+            var found = pos != end;
+            pos = end;
+            return found;
+        }
+        static bool ParseLimitedWhitespace(string input, ref int pos, int maxNewlinesToConsume)
+        {
+            int end = pos;
+            int consumedNewlines = 0;
+
+            while (end < input.Length && consumedNewlines < maxNewlinesToConsume)
+            {
+                char thisChar = input[end];
+                if (thisChar == '\r')
+                {
+                    end++;
+                    consumedNewlines++;
+
+                    if (end < input.Length && input[end] == '\n')
+                    {
+                        // Windows newline - just consume it
+                        end++;
+                    }
+                }
+                else if (thisChar == '\n')
+                {
+                    // Unix newline
+                    end++;
+                    consumedNewlines++;
+                }
+                else if (char.IsWhiteSpace(thisChar))
+                {
+                    // Consume the whitespace
+                    end++;
+                }
+                else
+                {
+                    break;
+                }
+            }
 
             var found = pos != end;
             pos = end;

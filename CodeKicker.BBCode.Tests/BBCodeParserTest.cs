@@ -385,5 +385,49 @@ namespace Tests2
             Assert.AreEqual(@"<a href=""http://codekicker.de"">http://codekicker.de</a>", parser.ToHtml(@"[url2]http://codekicker.de[/url2]"));
             Assert.AreEqual(@"<a href=""http://codekicker.de"">http://codekicker.de</a>", parser.ToHtml(@"[url2=http://codekicker.de]http://codekicker.de[/url2]"));
         }
+
+        [TestMethod]
+        public void StopProcessingDirective_StopsParserProcessingTagLikeText_UntilClosingTag()
+        {
+            var parser = new BBCodeParser(ErrorMode.ErrorFree, null, new[] { new BBTag("code", "<pre>", "</pre>") { StopProcessing = true } });
+
+            var input = "[code][i]This should [u]be a[/u] text literal[/i][/code]";
+            var expected = "<pre>[i]This should [u]be a[/u] text literal[/i]</pre>";
+
+            Assert.AreEqual(expected, parser.ToHtml(input));
+        }
+
+        [TestMethod]
+        public void GreedyAttributeProcessing_ConsumesAllTokensForAttributeValue()
+        {
+            var parser = new BBCodeParser(ErrorMode.ErrorFree, null, new[] { new BBTag("quote", "<div><span>Posted by ${name}</span>", "</div>", new BBAttribute("name", "")) { GreedyAttributeProcessing = true } });
+
+            var input = "[quote=Test User With Spaces]Here is my comment[/quote]";
+            var expected = "<div><span>Posted by Test User With Spaces</span>Here is my comment</div>";
+
+            Assert.AreEqual(expected, parser.ToHtml(input));
+        }
+
+        [TestMethod]
+        public void NewlineTrailingOpeningTagIsIgnored()
+        {
+            var parser = new BBCodeParser(ErrorMode.ErrorFree, null, new[] { new BBTag("code", "<pre>", "</pre>") });
+
+            var input = "[code]\nHere is some code[/code]";
+            var expected = "<pre>Here is some code</pre>"; // No newline after the opening PRE
+
+            Assert.AreEqual(expected, parser.ToHtml(input));
+        }
+
+        [TestMethod]
+        public void SuppressFirstNewlineAfter_StopsFirstNewlineAfterClosingTag()
+        {
+            var parser = new BBCodeParser(ErrorMode.ErrorFree, null, new[] { new BBTag("code", "<pre>", "</pre>"){ SuppressFirstNewlineAfter = true } });
+
+            var input = "[code]Here is some code[/code]\nMore text!";
+            var expected = "<pre>Here is some code</pre>More text!"; // No newline after the closing PRE
+
+            Assert.AreEqual(expected, parser.ToHtml(input));
+        }
     }
 }

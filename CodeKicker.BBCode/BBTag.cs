@@ -49,7 +49,10 @@ namespace CodeKicker.BBCode
         public string OpenTagTemplate { get; private set; }
         public string CloseTagTemplate { get; private set; }
         public bool AutoRenderContent { get; private set; }
-        public bool EnableIterationElementBehavior { get; private set; }
+        public bool StopProcessing { get; set; }
+        public bool GreedyAttributeProcessing { get; set; }
+        public bool SuppressFirstNewlineAfter { get; set; }
+        public bool EnableIterationElementBehavior { get; set; }
         public bool RequiresClosingTag
         {
             get { return TagClosingStyle == BBTagClosingStyle.RequiresClosingTag; }
